@@ -24,6 +24,11 @@ import java.util.Properties
 import kafka.utils._
 import org.apache.kafka.common.utils.Utils
 
+/**
+ * broker节点的元数据信息, 
+ * @param brokerId broker节点
+ * @param clusterId 集群节点
+ */
 case class BrokerMetadata(brokerId: Int,
                           clusterId: Option[String]) {
 

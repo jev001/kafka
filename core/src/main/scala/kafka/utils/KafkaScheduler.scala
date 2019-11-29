@@ -66,6 +66,8 @@ trait Scheduler {
  * @param daemon If true the scheduler threads will be "daemon" threads and will not block jvm shutdown.
  */
 @threadsafe
+// kafka调度器 重点
+// 因为标记了线程安全,所以这里面的如果含有多线程设计, 那么就会上锁. 可以查看有没有sync 或者 lock关键字
 class KafkaScheduler(val threads: Int, 
                      val threadNamePrefix: String = "kafka-scheduler-", 
                      daemon: Boolean = true) extends Scheduler with Logging {
@@ -74,7 +76,9 @@ class KafkaScheduler(val threads: Int,
 
   override def startup(): Unit = {
     debug("Initializing task scheduler.")
+    // 使用sync关键字. 锁住了当前对象this  
     this synchronized {
+      // 调度器是否已经启动了
       if(isStarted)
         throw new IllegalStateException("This scheduler has already been started!")
       executor = new ScheduledThreadPoolExecutor(threads)
@@ -101,15 +105,24 @@ class KafkaScheduler(val threads: Int,
     }
   }
 
+  // 计划执行一次. 
   def scheduleOnce(name: String, fun: () => Unit): Unit = {
     schedule(name, fun, delay = 0L, period = -1L, unit = TimeUnit.MILLISECONDS)
   }
 
+/**
+name 任务名称
+fun 任务执行器
+delay 延迟时间
+*/
   def schedule(name: String, fun: () => Unit, delay: Long, period: Long, unit: TimeUnit): ScheduledFuture[_] = {
     debug("Scheduling task %s with initial delay %d ms and period %d ms."
         .format(name, TimeUnit.MILLISECONDS.convert(delay, unit), TimeUnit.MILLISECONDS.convert(period, unit)))
+        // 每次调度都得锁住. 为什么定时任务都需要这样啊
     this synchronized {
+      // 确保定时任务已经开启
       ensureRunning()
+      // 构建一个new Runnable
       val runnable = CoreUtils.runnable {
         try {
           trace("Beginning execution of scheduled task '%s'.".format(name))

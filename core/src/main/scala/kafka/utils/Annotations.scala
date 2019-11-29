@@ -21,6 +21,9 @@ import scala.annotation.StaticAnnotation
 
 /* Some helpful annotations */
 
+// 此处的注解是对于维护者,开发者友好的. 但是对于程序未知. 因为程序没有对这些注解进行额外的维护. 
+// 开发人员在使用这些注解后. 可能会相应的实现标记的含义. 线程安全, 线程不安全, 恒定不变的?
+
 /**
  * Indicates that the annotated class is meant to be threadsafe. For an abstract class it is a part of the interface that an implementation
  * must respect

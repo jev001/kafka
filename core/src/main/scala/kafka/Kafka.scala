@@ -62,8 +62,10 @@ object Kafka extends Logging {
     props
   }
 
+  // kafka启动
   def main(args: Array[String]): Unit = {
     try {
+      // 获取服务端信息
       val serverProps = getPropsFromArgs(args)
       val kafkaServerStartable = KafkaServerStartable.fromProps(serverProps)
 
@@ -81,6 +83,7 @@ object Kafka extends Logging {
         override def run(): Unit = kafkaServerStartable.shutdown()
       })
 
+      // 开启kafka服务端
       kafkaServerStartable.startup()
       kafkaServerStartable.awaitShutdown()
     }
