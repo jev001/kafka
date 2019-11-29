@@ -53,6 +53,7 @@ import org.apache.kafka.server.authorizer.Authorizer
 import scala.collection.JavaConverters._
 import scala.collection.{Map, Seq, mutable}
 
+// kafka服务器类. woc 从Kafka.scala 到 KafkaServerStartable再到KafkaServer 调用链太长了
 object KafkaServer {
   // Copy the subset of properties that are relevant to Logs
   // I'm listing out individual properties here since the names are slightly different in each Config class...
@@ -99,37 +100,53 @@ object KafkaServer {
  * Represents the lifecycle of a single Kafka broker. Handles all functionality required
  * to start up and shutdown a single Kafka node.
  */
+/**
+ * config
+ */
 class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNamePrefix: Option[String] = None,
                   kafkaMetricsReporters: Seq[KafkaMetricsReporter] = List()) extends Logging with KafkaMetricsGroup {
+                    
+  // 是否启动完成
   private val startupComplete = new AtomicBoolean(false)
+  // 是否关闭
   private val isShuttingDown = new AtomicBoolean(false)
+  // 是否启动
   private val isStartingUp = new AtomicBoolean(false)
 
   private var shutdownLatch = new CountDownLatch(1)
 
+  // JMX标记
   private val jmxPrefix: String = "kafka.server"
 
+  // 日志上下文概念
   private var logContext: LogContext = null
 
   var metrics: Metrics = null
-
+  // 节点状态
   val brokerState: BrokerState = new BrokerState
 
   var dataPlaneRequestProcessor: KafkaApis = null
   var controlPlaneRequestProcessor: KafkaApis = null
 
+  // 认证
   var authorizer: Option[Authorizer] = None
+  // 什么的服务器
   var socketServer: SocketServer = null
+  // 数据层请求池
   var dataPlaneRequestHandlerPool: KafkaRequestHandlerPool = null
+  // 控制层请求处理池
   var controlPlaneRequestHandlerPool: KafkaRequestHandlerPool = null
 
+  // 失败日志通道->失败请求处理队列
   var logDirFailureChannel: LogDirFailureChannel = null
+  // 日志管理
   var logManager: LogManager = null
 
   var replicaManager: ReplicaManager = null
   var adminManager: AdminManager = null
   var tokenManager: DelegationTokenManager = null
 
+  // 动态配置处理. 此处猜测是做配置中心的
   var dynamicConfigHandlers: Map[String, ConfigHandler] = null
   var dynamicConfigManager: DynamicConfigManager = null
   var credentialProvider: CredentialProvider = null
@@ -143,9 +160,12 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
 
   var kafkaScheduler: KafkaScheduler = null
 
+  // 元数据缓存?
   var metadataCache: MetadataCache = null
+  // 这个地方应该是PAXOS协议中的票数 限定了
   var quotaManagers: QuotaFactory.QuotaManagers = null
 
+  // kafka链接ZK 用作配置和发现
   private var _zkClient: KafkaZkClient = null
   val correlationId: AtomicInteger = new AtomicInteger(0)
   val brokerMetaPropsFile = "meta.properties"
@@ -189,13 +209,16 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
    * Start up API for bringing up a single instance of the Kafka server.
    * Instantiates the LogManager, the SocketServer and the request handlers - KafkaRequestHandlers
    */
+  // 开始启动Kafka的服务端. 
   def startup(): Unit = {
     try {
       info("starting")
 
+      // 如果关闭. 提示用户重新开启kafka server
       if (isShuttingDown.get)
         throw new IllegalStateException("Kafka server is still shutting down, cannot re-start!")
 
+      // 已经开启那么就不开了
       if (startupComplete.get)
         return
 
@@ -203,14 +226,18 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
       if (canStartup) {
         brokerState.newState(Starting)
 
+        // 初始化zk客户端 初始化完kafka给zk的kafka用的节点后关闭
         /* setup zookeeper */
         initZkClient(time)
 
         /* Get or create cluster_id */
+        // 从zk中获取服务器的集群节点编号. 
         _clusterId = getOrGenerateClusterId(zkClient)
+        // 获取到了节点编号了
         info(s"Cluster ID = $clusterId")
 
         /* load metadata */
+        // 从磁盘中获取元数据,意味着zk挂掉了都可以?
         val (preloadedBrokerMetadataCheckpoint, initialOfflineDirs) = getBrokerMetadataAndOfflineDirs
 
         /* check cluster id */
@@ -220,7 +247,9 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
             s"The broker is trying to join the wrong cluster. Configured zookeeper.connect may be wrong.")
 
         /* generate brokerId */
+        // 生成broker节点
         config.brokerId = getOrGenerateBrokerId(preloadedBrokerMetadataCheckpoint)
+        // 创建日志
         logContext = new LogContext(s"[KafkaServer id=${config.brokerId}] ")
         this.logIdent = logContext.logPrefix
 
@@ -229,10 +258,12 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
         config.dynamicConfig.initialize(zkClient)
 
         /* start scheduler */
+        // 这个是kafka 的定时任务调度器 内部是一个线程池
         kafkaScheduler = new KafkaScheduler(config.backgroundThreads)
         kafkaScheduler.startup()
 
         /* create and configure metrics */
+        // 状态报告记录
         val reporters = new util.ArrayList[MetricsReporter]
         reporters.add(new JmxReporter(jmxPrefix))
         val metricConfig = KafkaServer.metricConfig(config)
@@ -242,6 +273,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
         _brokerTopicStats = new BrokerTopicStats
 
         quotaManagers = QuotaFactory.instantiate(config, metrics, time, threadNamePrefix.getOrElse(""))
+        // 通知集群交换状态
         notifyClusterListeners(kafkaMetricsReporters ++ metrics.reporters.asScala)
 
         logDirFailureChannel = new LogDirFailureChannel(config.logDirs.size)
@@ -259,6 +291,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
         // Create and start the socket server acceptor threads so that the bound port is known.
         // Delay starting processors until the end of the initialization sequence to ensure
         // that credentials have been loaded before processing authentications.
+        // 创建一个不普通的socketserver
         socketServer = new SocketServer(config, metrics, time, credentialProvider)
         socketServer.startup(startupProcessors = false)
 
@@ -367,19 +400,28 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
     new ReplicaManager(config, metrics, time, zkClient, kafkaScheduler, logManager, isShuttingDown, quotaManagers,
       brokerTopicStats, metadataCache, logDirFailureChannel)
 
+  // 
   private def initZkClient(time: Time): Unit = {
     info(s"Connecting to zookeeper on ${config.zkConnect}")
-
+    // 闭包函数
+    /**
+     * 
+     * @param zkConnect kafka
+     * @param isSecure
+     * @return
+     */
     def createZkClient(zkConnect: String, isSecure: Boolean) =
       KafkaZkClient(zkConnect, isSecure, config.zkSessionTimeoutMs, config.zkConnectionTimeoutMs,
         config.zkMaxInFlightRequests, time, name = Some("Kafka server"))
 
+    //  zk链接字符串 获取链接根节点之前的
     val chrootIndex = config.zkConnect.indexOf("/")
     val chrootOption = {
       if (chrootIndex > 0) Some(config.zkConnect.substring(chrootIndex))
       else None
     }
 
+    // kafka是否需要开启安全访问.  SSL? acl?
     val secureAclsEnabled = config.zkEnableSecureAcls
     val isZkSecurityEnabled = JaasUtils.isZkSecurityEnabled()
 
@@ -390,7 +432,9 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
     // make sure chroot path exists
     chrootOption.foreach { chroot =>
       val zkConnForChrootCreation = config.zkConnect.substring(0, chrootIndex)
+      // 创建zk链接客户端
       val zkClient = createZkClient(zkConnForChrootCreation, secureAclsEnabled)
+      // 持久化kafka 链接的根节点(可自定义) 到zk服务器中
       zkClient.makeSurePersistentPathExists(chroot)
       info(s"Created zookeeper path $chroot")
       zkClient.close()
@@ -400,6 +444,12 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
     _zkClient.createTopLevelPaths()
   }
 
+  /**
+   * 生成当前服务器的节点编号
+   *   根据CoreUtils 生成的节点应该是随机的...
+   * @param zkClient
+   * @return
+   */
   private def getOrGenerateClusterId(zkClient: KafkaZkClient): String = {
     zkClient.getClusterId.getOrElse(zkClient.createOrGetClusterId(CoreUtils.generateUuidAsBase64))
   }

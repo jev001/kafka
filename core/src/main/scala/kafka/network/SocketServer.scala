@@ -72,12 +72,14 @@ import scala.util.control.ControlThrowable
  *      Acceptor has 1 Processor thread that has its own selector and read requests from the socket.
  *      1 Handler thread that handles requests and produce responses back to the processor thread for writing.
  */
+ // 服务器 使用NIO 完成 重要
 class SocketServer(val config: KafkaConfig,
                    val metrics: Metrics,
                    val time: Time,
                    val credentialProvider: CredentialProvider)
   extends Logging with KafkaMetricsGroup with BrokerReconfigurable {
 
+  // 并发请求队列
   private val maxQueuedRequests = config.queuedMaxRequests
 
   private val logContext = new LogContext(s"[SocketServer brokerId=${config.brokerId}] ")
@@ -416,7 +418,7 @@ class SocketServer(val config: KafkaConfig,
   private[network] def dataPlaneProcessor(index: Int): Processor = dataPlaneProcessors.get(index)
 
 }
-
+// 服务器对象
 object SocketServer {
   val MetricsGroup = "socket-server-metrics"
   val DataPlaneThreadPrefix = "data-plane"
@@ -504,6 +506,7 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
                               connectionQuotas: ConnectionQuotas,
                               metricPrefix: String) extends AbstractServerThread(connectionQuotas) with KafkaMetricsGroup {
 
+  // NIO 操作 注册处理器
   private val nioSelector = NSelector.open()
   val serverChannel = openServerSocket(endPoint.host, endPoint.port)
   private val processors = new ArrayBuffer[Processor]()
@@ -557,7 +560,7 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
       var currentProcessorIndex = 0
       while (isRunning) {
         try {
-
+// NIO 操作 注册处理器
           val ready = nioSelector.select(500)
           if (ready > 0) {
             val keys = nioSelector.selectedKeys()

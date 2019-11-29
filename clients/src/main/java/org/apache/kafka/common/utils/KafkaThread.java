@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A wrapper for Thread that sets things up nicely
  */
+// woc kafka自己造线程. 这个线程有什么不同呢？ emmm 增加了线程名和是否是守护线程
 public class KafkaThread extends Thread {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
