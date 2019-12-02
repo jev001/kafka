@@ -141,7 +141,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
   var logDirFailureChannel: LogDirFailureChannel = null
   // 日志管理
   var logManager: LogManager = null
-
+  // 副本管理器
   var replicaManager: ReplicaManager = null
   var adminManager: AdminManager = null
   var tokenManager: DelegationTokenManager = null
@@ -296,13 +296,17 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
         socketServer.startup(startupProcessors = false)
 
         /* start replica manager */
+        // 重点!!! 副本
         replicaManager = createReplicaManager(isShuttingDown)
         replicaManager.startup()
 
+        //注册成为 broker 节点
         val brokerInfo = createBrokerInfo
+        // 在zk中写入brocker信息
         val brokerEpoch = zkClient.registerBroker(brokerInfo)
 
         // Now that the broker is successfully registered, checkpoint its metadata
+        // 检查brocker节点数据. 重要.
         checkpointBrokerMetadata(BrokerMetadata(config.brokerId, Some(clusterId)))
 
         /* start token manager */
