@@ -18,6 +18,7 @@ package org.apache.kafka.clients;
 
 import java.util.Locale;
 
+// 客户端DNS解析器. 一般用于暂定
 public enum ClientDnsLookup {
 
     DEFAULT("default"),
