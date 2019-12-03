@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
  * An internal mutable cache of nodes, topics, and partitions in the Kafka cluster. This keeps an up-to-date Cluster
  * instance which is optimized for read access.
  */
+// 元数据解析缓存. 这个地方存放了历史元数据信息. 会经常更新. 这个需要保持集群的一致性* 重要.
 public class MetadataCache {
     private final String clusterId;
     private final List<Node> nodes;

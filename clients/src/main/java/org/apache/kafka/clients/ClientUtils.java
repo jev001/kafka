@@ -43,7 +43,9 @@ public final class ClientUtils {
     private ClientUtils() {
     }
 
+    // 解析服务器地址是否于晓
     public static List<InetSocketAddress> parseAndValidateAddresses(List<String> urls, String clientDnsLookupConfig) {
+        // 客户端DNS解析. 
         return parseAndValidateAddresses(urls, ClientDnsLookup.forConfig(clientDnsLookupConfig));
     }
 
@@ -56,7 +58,7 @@ public final class ClientUtils {
                     Integer port = getPort(url);
                     if (host == null || port == null)
                         throw new ConfigException("Invalid url in " + CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG + ": " + url);
-
+                    // 如果DNS解析器是 仅仅用于投票的牧师节点? 分布式一致协议里面的? paxos中的牧师
                     if (clientDnsLookup == ClientDnsLookup.RESOLVE_CANONICAL_BOOTSTRAP_SERVERS_ONLY) {
                         InetAddress[] inetAddresses = InetAddress.getAllByName(host);
                         for (InetAddress inetAddress : inetAddresses) {

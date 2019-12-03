@@ -209,6 +209,7 @@ public class Metadata implements Closeable {
         }
     }
 
+    // 元数据解析启动
     public synchronized void bootstrap(List<InetSocketAddress> addresses, long now) {
         this.needUpdate = true;
         this.lastRefreshMs = now;

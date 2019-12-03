@@ -29,6 +29,7 @@ import org.apache.kafka.common.utils.Utils;
  * An internal class that implements a cache used for sticky partitioning behavior. The cache tracks the current sticky
  * partition for any given topic. This class should not be used externally. 
  */
+// 分区缓存
 public class StickyPartitionCache {
     private final ConcurrentMap<String, Integer> indexCache;
     public StickyPartitionCache() {
@@ -43,6 +44,7 @@ public class StickyPartitionCache {
         return part;
     }
 
+    // 每次获取下一个分区的时候 都会往缓存里面存放. 这个可以作为自定义缓存的写法
     public int nextPartition(String topic, Cluster cluster, int prevPartition) {
         List<PartitionInfo> partitions = cluster.partitionsForTopic(topic);
         Integer oldPart = indexCache.get(topic);
@@ -64,6 +66,7 @@ public class StickyPartitionCache {
             }
             // Only change the sticky partition if it is null or prevPartition matches the current sticky partition.
             if (oldPart == null) {
+                // 如果存在就不添加. 这个地方使用了Concurrent保证并发情况下唯一
                 indexCache.putIfAbsent(topic, newPart);
             } else {
                 indexCache.replace(topic, prevPartition, newPart);

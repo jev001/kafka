@@ -80,6 +80,7 @@ import static org.apache.kafka.common.record.RecordBatch.NO_PRODUCER_ID;
 /**
  * A class which maintains state for transactions. Also keeps the state necessary to ensure idempotent production.
  */
+// 事务管理器.kafka 可以维护一个事务管理器. 一起成功一起失败
 public class TransactionManager {
     private static final int NO_INFLIGHT_REQUEST_CORRELATION_ID = -1;
     private static final int NO_LAST_ACKED_SEQUENCE_NUMBER = -1;

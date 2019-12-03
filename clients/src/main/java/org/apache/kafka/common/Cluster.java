@@ -275,6 +275,7 @@ public final class Cluster {
      * @param topic The topic to get the number of partitions for
      * @return The number of partitions or null if there is no corresponding metadata
      */
+    // 获取Partition的的数量. kafka对于topic 是划分了多个partition的?
     public Integer partitionCountForTopic(String topic) {
         List<PartitionInfo> partitions = this.partitionsByTopic.get(topic);
         return partitions == null ? null : partitions.size();
