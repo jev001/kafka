@@ -253,6 +253,11 @@ public class Sender implements Runnable {
         // okay we stopped accepting requests but there may still be
         // requests in the transaction manager, accumulator or waiting for acknowledgment,
         // wait until these are completed.
+        
+
+
+        // 关闭流程里面的操作
+        // 优雅的关闭. 拒绝接受之后的请求,但是当前求是在提个事物管理中. 需要等待所有的确认消息后再自动关闭
         while (!forceClose && ((this.accumulator.hasUndrained() || this.client.inFlightRequestCount() > 0) || hasPendingTransactionalRequests())) {
             try {
                 runOnce();
@@ -262,6 +267,7 @@ public class Sender implements Runnable {
         }
 
         // Abort the transaction if any commit or abort didn't go through the transaction manager's queue
+        // 如果有
         while (!forceClose && transactionManager != null && transactionManager.hasOngoingTransaction()) {
             if (!transactionManager.isCompleting()) {
                 log.info("Aborting incomplete transaction due to shutdown");
@@ -277,6 +283,7 @@ public class Sender implements Runnable {
         if (forceClose) {
             // We need to fail all the incomplete transactional requests and batches and wake up the threads waiting on
             // the futures.
+            // 优雅关闭 kafka事物
             if (transactionManager != null) {
                 log.debug("Aborting incomplete transactional requests due to forced shutdown");
                 transactionManager.close();
