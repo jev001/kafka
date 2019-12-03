@@ -817,6 +817,7 @@ public class Sender implements Runnable {
     /**
      * Wake up the selector associated with this send thread
      */
+    // 唤醒NIO选择器. 
     public void wakeup() {
         this.client.wakeup();
     }

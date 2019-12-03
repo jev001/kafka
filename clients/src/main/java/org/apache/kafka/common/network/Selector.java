@@ -664,6 +664,7 @@ public class Selector implements Selectable, AutoCloseable {
         }
     }
 
+    // 尝试读取? socket链接可以尝试读取?
     private void attemptRead(SelectionKey key, KafkaChannel channel) throws IOException {
         //if channel is ready and has bytes to read from socket or buffer, and has no
         //previous receive(s) already staged or otherwise in progress then read from it

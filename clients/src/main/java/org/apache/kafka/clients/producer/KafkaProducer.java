@@ -1057,6 +1057,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // 请求更新元数据
             int version = metadata.requestUpdate();
             // 唤醒发送客户端
+            // 唤醒NetworkClient 唤醒NIO Selector 的操作
             sender.wakeup();
             // 内部构造请求数据
                 try {
