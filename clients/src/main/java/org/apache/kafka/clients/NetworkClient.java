@@ -66,6 +66,7 @@ import java.util.stream.Collectors;
  * <p>
  * This class is not thread-safe!
  */
+// kafka客户端.  用于网络处理的. 自己构建的网络处理器
 public class NetworkClient implements KafkaClient {
 
     private enum State {

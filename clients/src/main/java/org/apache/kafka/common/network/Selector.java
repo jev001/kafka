@@ -84,6 +84,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * This class is not thread safe!
  */
+// NIO 选择器, 重点中的重点 hard难度
 public class Selector implements Selectable, AutoCloseable {
 
     public static final long NO_IDLE_TIMEOUT_MS = -1;

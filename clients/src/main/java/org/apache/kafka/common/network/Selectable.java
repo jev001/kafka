@@ -25,6 +25,7 @@ import java.util.Map;
 /**
  * An interface for asynchronous, multi-channel network I/O
  */
+// NIO 处理的实现. 使用channel来处理任务的
 public interface Selectable {
 
     /**
