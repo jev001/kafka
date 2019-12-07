@@ -324,7 +324,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                   KafkaClient kafkaClient,
                   ProducerInterceptors interceptors,
                   Time time) {
-                      // 解析kafka配置信息
+        // 解析kafka配置信息 本地解析.
         ProducerConfig config = new ProducerConfig(ProducerConfig.addSerializerToConfig(configs, keySerializer,
                 valueSerializer));
         try {
@@ -395,6 +395,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             this.compressionType = CompressionType.forName(config.getString(ProducerConfig.COMPRESSION_TYPE_CONFIG));
 
             this.maxBlockTimeMs = config.getLong(ProducerConfig.MAX_BLOCK_MS_CONFIG);
+            // 创建一个事务管理器. 
             this.transactionManager = configureTransactionState(config, logContext, log);
             int deliveryTimeoutMs = configureDeliveryTimeout(config, log);
 
@@ -416,6 +417,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                     config.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG),
                     config.getString(ProducerConfig.CLIENT_DNS_LOOKUP_CONFIG));
                     // 如果不存在元数据,那么新建一个元数据信息
+            // 重要. 元数据里面存储了节点信息?
             if (metadata != null) {
                 this.metadata = metadata;
             } else {
@@ -527,20 +529,25 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
         return deliveryTimeoutMs;
     }
 
+    // 配置事务. 并且初始化事务状态
     private static TransactionManager configureTransactionState(ProducerConfig config, LogContext logContext, Logger log) {
 
         TransactionManager transactionManager = null;
 
         boolean userConfiguredIdempotence = false;
+        // 配置是否使用了幂等处理 - 不一定开启了幂等处理
         if (config.originals().containsKey(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG))
             userConfiguredIdempotence = true;
 
         boolean userConfiguredTransactions = false;
+        // 初始化的时候是否携带了事务ID,如果携带了事务ID需要开启事务
         if (config.originals().containsKey(ProducerConfig.TRANSACTIONAL_ID_CONFIG))
             userConfiguredTransactions = true;
 
+        // 配置文件中是否开启了幂等处理 和上面重复了?
         boolean idempotenceEnabled = config.getBoolean(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG);
 
+        // 在配置文件中意向是使用开启事务并且配置了幂等,但是实际上是没有开启幂等, 那么就抛出异常
         if (!idempotenceEnabled && userConfiguredIdempotence && userConfiguredTransactions)
             throw new ConfigException("Cannot set a " + ProducerConfig.TRANSACTIONAL_ID_CONFIG + " without also enabling idempotence.");
 
@@ -551,6 +558,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             String transactionalId = config.getString(ProducerConfig.TRANSACTIONAL_ID_CONFIG);
             int transactionTimeoutMs = config.getInt(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG);
             long retryBackoffMs = config.getLong(ProducerConfig.RETRY_BACKOFF_MS_CONFIG);
+            // 创建事物管理器
             transactionManager = new TransactionManager(logContext, transactionalId, transactionTimeoutMs, retryBackoffMs);
             if (transactionManager.isTransactional())
                 log.info("Instantiated a transactional producer.");

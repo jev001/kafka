@@ -103,9 +103,10 @@ public class AbstractConfig {
         for (Map.Entry<?, ?> entry : originals.entrySet())
             if (!(entry.getKey() instanceof String))
                 throw new ConfigException(entry.getKey().toString(), entry.getValue(), "Key must be a string.");
-
+        // 确认配置信息,解析原始数据(一般是从配置文件中获取.然后解析成对应关系)
         this.originals = resolveConfigVariables(configProviderProps, (Map<String, Object>) originals);
         this.values = definition.parse(this.originals);
+        // 
         Map<String, Object> configUpdates = postProcessParsedConfig(Collections.unmodifiableMap(this.values));
         for (Map.Entry<String, Object> update : configUpdates.entrySet()) {
             this.values.put(update.getKey(), update.getValue());

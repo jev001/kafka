@@ -375,6 +375,7 @@ public class ProducerConfig extends AbstractConfig {
                                         TRANSACTIONAL_ID_DOC);
     }
 
+    // *处理* 初次载入后的配置信息
     @Override
     protected Map<String, Object> postProcessParsedConfig(final Map<String, Object> parsedValues) {
         return CommonClientConfigs.postProcessReconnectBackoffConfigs(this, parsedValues);
