@@ -524,6 +524,7 @@ public class NetworkClient implements KafkaClient {
      * @return The list of responses received
      */
     @Override
+    // 重要
     public List<ClientResponse> poll(long timeout, long now) {
         ensureActive();
 
@@ -531,11 +532,14 @@ public class NetworkClient implements KafkaClient {
             // If there are aborted sends because of unsupported version exceptions or disconnects,
             // handle them immediately without waiting for Selector#poll.
             List<ClientResponse> responses = new ArrayList<>();
+            // 结束发送处理
             handleAbortedSends(responses);
+            // 完成结束发送处理 获取返回消息
             completeResponses(responses);
             return responses;
         }
 
+        // 尝试刷新元数据信息(重要),是给metadata.fetch用的.
         long metadataTimeout = metadataUpdater.maybeUpdate(now);
         try {
             this.selector.poll(Utils.min(timeout, metadataTimeout, defaultRequestTimeoutMs));
@@ -546,12 +550,20 @@ public class NetworkClient implements KafkaClient {
         // process completed actions
         long updatedNow = this.time.milliseconds();
         List<ClientResponse> responses = new ArrayList<>();
+        // 完成发送处理
         handleCompletedSends(responses, updatedNow);
+        // 完成消息回复处理
         handleCompletedReceives(responses, updatedNow);
+        // 处理已关闭的请求链接(这个是). 对已关闭的请求链接进行说明, 并且刷新metadata数据
         handleDisconnections(responses, updatedNow);
+        // 处理已连接的节点, 查看是否需要刷新节点信息. 保活用的 包括但不限于api版本过低的节点
         handleConnections();
+        //初始化版本请求 
+        // 更新API版本
         handleInitiateApiVersionRequests(updatedNow);
+        // 处理发生timeout信息的节点,如果链接时间太长了,那么就关闭它, 更新元数据信息
         handleTimedOutRequests(responses, updatedNow);
+        // 完成请求回复
         completeResponses(responses);
 
         return responses;
@@ -729,9 +741,14 @@ public class NetworkClient implements KafkaClient {
                                       String nodeId,
                                       long now,
                                       ChannelState disconnectState) {
+
+        // 链接状态中属于关闭状态的数据有哪些
         connectionStates.disconnected(nodeId, now);
+        // 剔除已经断开的链接的 API版本信息
         apiVersions.remove(nodeId);
+        // 剔除需要刷新API版本信息的节点
         nodesNeedingApiVersionsFetch.remove(nodeId);
+        // 告诉客户端. 是因为什么问题而断开链接
         switch (disconnectState.state()) {
             case AUTHENTICATION_FAILED:
                 AuthenticationException exception = disconnectState.exception();
@@ -753,6 +770,7 @@ public class NetworkClient implements KafkaClient {
             default:
                 break; // Disconnections in other states are logged at debug level in Selector
         }
+        // 
         for (InFlightRequest request : this.inFlightRequests.clearAll(nodeId)) {
             log.trace("Cancelled request {} {} with correlation id {} due to node {} being disconnected",
                     request.header.apiKey(), request.request, request.header.correlationId(), nodeId);
@@ -885,6 +903,7 @@ public class NetworkClient implements KafkaClient {
 
     /**
      * Handle any disconnected connections
+     * 处理已关闭的链接
      *
      * @param responses The list of responses that completed with the disconnection
      * @param now The current time
@@ -897,6 +916,7 @@ public class NetworkClient implements KafkaClient {
         }
         // we got a disconnect so we should probably refresh our metadata and see if that broker is dead
         if (this.selector.disconnected().size() > 0)
+            // 刷新元数据, 查看断开连接的是否关闭了. (此处请求的数据都是kafka内部投票处理来的)
             metadataUpdater.requestUpdate();
     }
 
